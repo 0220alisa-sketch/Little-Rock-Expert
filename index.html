@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>岩類小偵探：地質尋寶大挑戰</title>
-  <!-- 引入雲端 p5.js 核心引擎，完全不需要本機 libraries 資料夾 -->
+  <!-- 引入 p5.js 核心引擎 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
   <style>
     body {
@@ -54,7 +54,7 @@ const ORIGINAL_QUESTIONS = [
   },
   {
     imgIdx: 2,
-    q: "3. 這塊岩石呈現在一層一層明顯的「層理」，有時還能找到化石，屬於哪類岩石？",
+    q: "3. 這塊岩石呈現出一層一層明顯的「層理」，有時還能找到化石，屬於哪類岩石？",
     options: ["火成岩", "沉積岩", "變質岩"],
     answer: "沉積岩",
     explain: "【地質小百科】\n沉積岩是由泥沙、生物碎屑經年累月在水底堆積、壓密膠結而成的。因為是一層層慢慢覆蓋，所以具有獨特的「層理」構造，古代動植物被掩埋後更有機會形成珍貴的化石，是紀錄地球歷史的書頁！"
@@ -85,9 +85,10 @@ const ORIGINAL_QUESTIONS = [
 let questions = [];
 
 function preload() {
-  explorerImg = loadImage('assets/explorer.png');
+  // 直接從根目錄抓取圖片
+  explorerImg = loadImage('explorer.png');
   for (let i = 1; i <= 6; i++) {
-    rockImgs.push(loadImage(`assets/rock${i}.jpg`));
+    rockImgs.push(loadImage(`rock${i}.jpg`));
   }
 }
 
@@ -449,7 +450,7 @@ function drawCustomButton(x, y, w, h, label, textCol, bgCol, txtSize = 16) {
   fill(bgCol);
   rect(x, y, w, h, 10);
 
- if (isMouseInRect(x, y, w, h)) {
+  if (isMouseInRect(x, y, w, h)) {
     cursor(HAND);
     fill(255, 45);
     rect(x, y, w, h, 10);
