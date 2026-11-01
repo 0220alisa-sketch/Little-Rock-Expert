@@ -1,18 +1,479 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>岩類小偵探：地質尋寶大挑戰</title>
-
-  <link rel="stylesheet" href="./style.css">
-
-  <script src="./p5.min.js"></script>
+  <!-- 引入雲端 p5.js 核心引擎，完全不需要本機 libraries 資料夾 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #c6ac8f;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+  </style>
 </head>
-
 <body>
-  <script src="./sketch.js"></script>
+
+<script>
+// ==========================================
+// PBL 專題：岩類小偵探 - 多媒體測驗系統
+// ==========================================
+
+let gameState = 0; // 0: 開始, 1: 題目, 2: 回饋, 3: 成績
+let currentQuestionIndex = 0;
+let score = 0;
+let showMagnifier = false; 
+let isCorrect = false;
+
+// 圖片變數
+let explorerImg;
+let rockImgs = [];
+
+// 豐富科普版本的 6 道岩石題目資料庫
+const ORIGINAL_QUESTIONS = [
+  {
+    imgIdx: 0,
+    q: "1. 觀察這塊黑色岩石，表面有許多細小的「氣孔」，它是哪一種火成岩？",
+    options: ["玄武岩", "花崗岩", "大理岩"],
+    answer: "玄武岩",
+    explain: "【地質小百科】\n玄武岩是火山噴發出的熔岩在地表快速冷卻形成的噴出岩。因為冷卻速度極快，氣體來不及排出而被包覆在裡面，便留下了許多微小的氣孔。台灣澎湖著名的柱狀玄武岩景觀就是它的代表喔！"
+  },
+  {
+    imgIdx: 1,
+    q: "2. 這塊岩石具有粗大且明顯的「斑點結晶」，通常形成於地下深處，它是？",
+    options: ["頁岩", "花崗岩", "板岩"],
+    answer: "花崗岩",
+    explain: "【地質小百科】\n花崗岩屬於深成火成岩，是由岩漿在地殼深處慢慢冷卻凝固而成。因為冷卻時間長，石英、長石與雲母有充裕的時間成長結晶，形成黑、白、粉紅相間的粗大斑點，質地堅硬，常被作為建築與雕像材質！"
+  },
+  {
+    imgIdx: 2,
+    q: "3. 這塊岩石呈現在一層一層明顯的「層理」，有時還能找到化石，屬於哪類岩石？",
+    options: ["火成岩", "沉積岩", "變質岩"],
+    answer: "沉積岩",
+    explain: "【地質小百科】\n沉積岩是由泥沙、生物碎屑經年累月在水底堆積、壓密膠結而成的。因為是一層層慢慢覆蓋，所以具有獨特的「層理」構造，古代動植物被掩埋後更有機會形成珍貴的化石，是紀錄地球歷史的書頁！"
+  },
+  {
+    imgIdx: 3,
+    q: "4. 石灰岩經過地殼的高溫高壓「變質作用」後，會變成哪一種美麗的岩石？",
+    options: ["砂岩", "大理岩", "玄武岩"],
+    answer: "大理岩",
+    explain: "【地質小百科】\n當原本的石灰岩深埋地下，受到極高溫與強大壓力時，內部的方解石會重新結晶，變質轉化為紋理優雅的「大理岩」。台灣花蓮太魯閣峽谷著名的壯麗懸崖，就是由厚重的大理岩層構成的！"
+  },
+  {
+    imgIdx: 4,
+    q: "5. 摸起來手感粗糙，由許多細小的砂粒壓密膠結而成的沉積岩是？",
+    options: ["砂岩", "黑曜岩", "安山岩"],
+    answer: "砂岩",
+    explain: "【地質小百科】\n砂岩主要由粒徑介於 0.0625 至 2 毫米之間的石英與長石砂粒膠結而成。因為顆粒大小適中且多角，摸起來像砂紙一樣手感粗糙。它耐風化性強，野外常形成突出的山脊或海蝕崖（如野柳女王頭的硬岩層）！"
+  },
+  {
+    imgIdx: 5,
+    q: "6. 在太魯閣峽谷常見，具有片理構造、是由頁岩變質而成的岩石是？",
+    options: ["板岩", "花崗石", "石膏"],
+    answer: "板岩",
+    explain: "【地質小百科】\n細粒的頁岩在地殼變動過程中受到區域性的區域變質擠壓時，會形成具有平行切分薄片特性的「板岩」（具板狀劈理）。台灣原住民排灣族與魯凱族傳統工藝中，就常運用板岩來建造堅固又耐用的石板屋！"
+  }
+];
+
+let questions = [];
+
+function preload() {
+  explorerImg = loadImage('assets/explorer.png');
+  for (let i = 1; i <= 6; i++) {
+    rockImgs.push(loadImage(`assets/rock${i}.jpg`));
+  }
+}
+
+function setup() {
+  createCanvas(800, 700);
+  textAlign(CENTER, CENTER);
+  textFont("Microsoft JhengHei");
+  resetGame();
+}
+
+function draw() {
+  background(198, 172, 143); // 統一背景顏色 #c6ac8f
+
+  drawBackgroundDeco();
+
+  if (gameState === 0) {
+    drawStartScreen();
+  } else if (gameState === 1) {
+    drawQuizScreen();
+  } else if (gameState === 2) {
+    drawFeedbackScreen();
+  } else if (gameState === 3) {
+    drawEndScreen();
+  }
+}
+
+// 🎨 常駐背景可愛插圖
+function drawBackgroundDeco() {
+  push();
+  noStroke();
+
+  fill(255, 255, 255, 60);
+  ellipse(60, 60, 100, 100);
+  ellipse(740, 640, 120, 120);
+
+  // 可愛小錘子
+  push();
+  translate(50, 80);
+  rotate(-QUARTER_PI);
+  fill(139, 69, 19);
+  rect(0, 0, 8, 40, 3);
+  fill(160, 160, 160);
+  rect(-10, -5, 28, 10, 2);
+  pop();
+
+  // 化石貝殼插圖
+  push();
+  translate(730, 80);
+  fill(235, 215, 185);
+  arc(0, 0, 36, 36, 0, PI);
+  stroke(180, 150, 120);
+  strokeWeight(1.5);
+  line(0, 0, 0, 18);
+  line(-8, 0, -5, 17);
+  line(8, 0, 5, 17);
+  pop();
+
+  // 小岩石聚落
+  fill(140, 120, 100);
+  ellipse(60, 640, 24, 16);
+  fill(170, 150, 130);
+  ellipse(80, 645, 18, 12);
+
+  // 閃爍星星
+  drawStar(720, 220, 6, 12, 5, color(255, 230, 120, 180));
+  drawStar(70, 500, 5, 10, 5, color(255, 230, 120, 180));
+  drawStar(680, 520, 7, 14, 5, color(255, 230, 120, 180));
+
+  pop();
+}
+
+// 畫面 0：開始畫面
+function drawStartScreen() {
+  if (explorerImg) {
+    imageMode(CENTER);
+    image(explorerImg, width / 2, 210, 180, 220);
+    imageMode(CORNER);
+  }
+
+  drawStar(220, 180, 8, 16, 5, color(255, 220, 80));
+  drawStar(580, 180, 8, 16, 5, color(255, 220, 80));
+
+  push();
+  textSize(40);
+  textStyle(BOLD);
+  textAlign(CENTER, CENTER);
+  fill(255);
+  for (let angle = 0; angle < TWO_PI; angle += QUARTER_PI) {
+    text("我是地質小專家", width / 2 + cos(angle) * 3.5, 345 + sin(angle) * 3.5);
+  }
+  fill(153, 88, 42);
+  text("我是地質小專家", width / 2, 345);
+  pop();
+
+  drawCustomButton(width / 2 - 110, 450, 220, 55, "開始遊戲", color(188, 108, 37), color(255));
+}
+
+// 畫面 1：題目畫面
+function drawQuizScreen() {
+  let q = questions[currentQuestionIndex];
+  let img = rockImgs[q.imgIdx];
+
+  fill(153, 88, 42);
+  rect(40, 15, 720, 35, 6);
+  fill(255);
+  textSize(16);
+  textAlign(LEFT, CENTER);
+  text(`第 ${currentQuestionIndex + 1} / ${questions.length} 題`, 55, 32);
+  textAlign(RIGHT, CENTER);
+  text(`目前得分：${score} 分`, 745, 32);
+
+  let imgW = 400;
+  let imgH = 300;
+  let imgX = (width - imgW) / 2;
+  let imgY = 60;
+
+  stroke(100);
+  strokeWeight(2);
+  fill(240);
+  rect(imgX, imgY, imgW, imgH, 8);
+  noStroke();
+
+  if (img) {
+    image(img, imgX, imgY, imgW, imgH);
+  }
+
+  push();
+  fill(0);
+  textSize(13);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  text("圖片來源：維基百科", width / 2, imgY + imgH + 6);
+  pop();
+
+  let btnW = 100, btnH = 35;
+  let btnX = imgX + imgW - btnW - 10;
+  let btnY = imgY + imgH - btnH - 10;
+  let magColor = showMagnifier ? color(188, 108, 37) : color(153, 88, 42);
+  drawCustomButton(btnX, btnY, btnW, btnH, showMagnifier ? "關閉放大" : "🔍 放大鏡", color(255), magColor, 14);
+
+  if (showMagnifier && mouseX >= imgX && mouseX <= imgX + imgW && mouseY >= imgY && mouseY <= imgY + imgH) {
+    let lensSize = 80;
+    let zoomFactor = 2;
+    let relX = mouseX - imgX;
+    let relY = mouseY - imgY;
+
+    push();
+    stroke(255, 230, 0);
+    strokeWeight(3);
+    fill(0, 50);
+    rect(mouseX - lensSize/2, mouseY - lensSize/2, lensSize, lensSize);
+    
+    let sWidth = lensSize / zoomFactor;
+    let sHeight = lensSize / zoomFactor;
+    let sx = relX - sWidth / 2;
+    let sy = relY - sHeight / 2;
+    
+    sx = constrain(sx, 0, imgW - sWidth);
+    sy = constrain(sy, 0, imgH - sHeight);
+
+    image(img, mouseX - lensSize/2, mouseY - lensSize/2, lensSize, lensSize, sx * (img.width/imgW), sy * (img.height/imgH), sWidth * (img.width/imgW), sHeight * (img.height/imgH));
+    pop();
+  }
+
+  textAlign(CENTER, CENTER);
+  fill(0);
+  textSize(17);
+  textStyle(BOLD);
+  let cleanQuestionText = q.q.replace(/^\d+\.\s*/, '');
+  text(`第 ${currentQuestionIndex + 1} 題：${cleanQuestionText}`, width / 2, 425);
+
+  textStyle(NORMAL);
+  for (let i = 0; i < q.options.length; i++) {
+    let optX = 120 + i * 200;
+    let optY = 485;
+    drawCustomButton(optX, optY, 160, 50, q.options[i], color(0), color(255, 240, 220));
+  }
+}
+
+// 畫面 2：回饋畫面
+function drawFeedbackScreen() {
+  let q = questions[currentQuestionIndex];
+
+  fill(255);
+  stroke(200);
+  rect(80, 70, 640, 480, 15);
+  noStroke();
+
+  if (isCorrect) {
+    fill(64, 192, 87);
+    rect(80, 70, 640, 65, 15, 15, 0, 0);
+    fill(255);
+    textSize(28);
+    textStyle(BOLD);
+    text("⭕ 答對了！太棒了！", width / 2, 102);
+    drawStar(120, 102, 7, 14, 5, color(255, 230, 0));
+    drawStar(680, 102, 7, 14, 5, color(255, 230, 0));
+  } else {
+    fill(250, 82, 82);
+    rect(80, 70, 640, 65, 15, 15, 0, 0);
+    fill(255);
+    textSize(28);
+    textStyle(BOLD);
+    text("❌ 答錯囉！再接再厲！", width / 2, 102);
+  }
+
+  fill(0);
+  textSize(18);
+  textStyle(BOLD);
+  text(`正確答案是：【 ${q.answer} 】`, width / 2, 165);
+
+  fill(50);
+  textStyle(NORMAL);
+  textAlign(CENTER, TOP);
+  const explanationWidth = 580;
+  const explanationTop = 205;
+  const explanationBottom = 430;
+  let explanationFontSize = 14;
+  textSize(explanationFontSize);
+  let explanationLines = wrapTextToWidth(q.explain, explanationWidth);
+  let lineHeight = explanationFontSize * 1.5;
+
+  while (explanationLines.length * lineHeight > explanationBottom - explanationTop && explanationFontSize > 10) {
+    explanationFontSize--;
+    textSize(explanationFontSize);
+    explanationLines = wrapTextToWidth(q.explain, explanationWidth);
+    lineHeight = explanationFontSize * 1.5;
+  }
+
+  for (let i = 0; i < explanationLines.length; i++) {
+    text(explanationLines[i], width / 2, explanationTop + i * lineHeight);
+  }
+  textAlign(CENTER, CENTER);
+
+  let btnText = (currentQuestionIndex < questions.length - 1) ? "下一題 ➔" : "查看總成績 🏆";
+  drawCustomButton(width / 2 - 90, 480, 180, 48, btnText, color(255), color(153, 88, 42));
+}
+
+function wrapTextToWidth(content, maxWidth) {
+  return content.split("\n").flatMap((paragraph) => {
+    const lines = [];
+    let line = "";
+
+    for (const character of paragraph) {
+      const candidate = line + character;
+      if (line && textWidth(candidate) > maxWidth) {
+        lines.push(line);
+        line = character;
+      } else {
+        line = candidate;
+      }
+    }
+
+    lines.push(line);
+    return lines;
+  });
+}
+
+// 畫面 3：成績畫面
+function drawEndScreen() {
+  fill(153, 88, 42);
+  rect(150, 100, 500, 95, 12);
+  fill(255);
+  textSize(30);
+  textStyle(BOLD);
+  text("測驗完成！成績結算", width / 2, 148);
+
+  let title = "地質小新手";
+  if (score >= 60) title = "岩石鑑定專家 🎓";
+  else if (score >= 40) title = "岩類小偵探 🔍";
+
+  fill(0);
+  textSize(22);
+  text(`最終得分：${score} / ${questions.length * 10} 分`, width / 2, 250);
+  
+  fill(188, 108, 37);
+  textSize(26);
+  text(`獲得稱號：${title}`, width / 2, 310);
+
+  drawCustomButton(width / 2 - 100, 420, 200, 50, "🔄 再玩一次", color(255), color(153, 88, 42));
+}
+
+// 滑鼠點擊事件
+function mousePressed() {
+  if (gameState === 0) {
+    if (isMouseInRect(width / 2 - 110, 450, 220, 55)) {
+      resetGame();
+      gameState = 1;
+    }
+  } else if (gameState === 1) {
+    let q = questions[currentQuestionIndex];
+    let imgW = 400, imgH = 300;
+    let imgX = (width - imgW) / 2;
+    let imgY = 60;
+    let btnW = 100, btnH = 35;
+    let btnX = imgX + imgW - btnW - 10;
+    let btnY = imgY + imgH - btnH - 10;
+
+    if (isMouseInRect(btnX, btnY, btnW, btnH)) {
+      showMagnifier = !showMagnifier;
+    }
+
+    for (let i = 0; i < q.options.length; i++) {
+      let optX = 120 + i * 200;
+      let optY = 485;
+      if (isMouseInRect(optX, optY, 160, 50)) {
+        if (q.options[i] === q.answer) {
+          isCorrect = true;
+          score += 10;
+        } else {
+          isCorrect = false;
+        }
+        gameState = 2;
+        break;
+      }
+    }
+  } else if (gameState === 2) {
+    if (isMouseInRect(width / 2 - 90, 480, 180, 48)) {
+      showMagnifier = false;
+      if (currentQuestionIndex < questions.length - 1) {
+        currentQuestionIndex++;
+        gameState = 1;
+      } else {
+        gameState = 3;
+      }
+    }
+  } else if (gameState === 3) {
+    if (isMouseInRect(width / 2 - 100, 420, 200, 50)) {
+      resetGame();
+      gameState = 0;
+    }
+  }
+}
+
+// 繪製星芒圖案
+function drawStar(cx, cy, radius1, radius2, npoints, col) {
+  let angle = TWO_PI / npoints;
+  let halfAngle = angle / 2.0;
+  push();
+  fill(col);
+  noStroke();
+  beginShape();
+  for (let a = 0; a < TWO_PI; a += angle) {
+    let sx = cx + cos(a) * radius2;
+    let sy = cy + sin(a) * radius2;
+    vertex(sx, sy);
+    sx = cx + cos(a + halfAngle) * radius1;
+    sy = cy + sin(a + halfAngle) * radius1;
+    vertex(sx, sy);
+  }
+  endShape(CLOSE);
+  pop();
+}
+
+// 自訂按鈕繪製
+function drawCustomButton(x, y, w, h, label, textCol, bgCol, txtSize = 16) {
+  push();
+  noStroke();
+  fill(bgCol);
+  rect(x, y, w, h, 10);
+
+  (isMouseInRect(x, y, w, h)) {
+    cursor(HAND);
+    fill(255, 45);
+    rect(x, y, w, h, 10);
+  }
+
+  fill(textCol);
+  textSize(txtSize);
+  textStyle(BOLD);
+  textAlign(CENTER, CENTER);
+  text(label, x + w / 2, y + h / 2);
+  pop();
+}
+
+function isMouseInRect(x, y, w, h) {
+  return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+}
+
+function resetGame() {
+  score = 0;
+  currentQuestionIndex = 0;
+  showMagnifier = false;
+  questions = shuffle([...ORIGINAL_QUESTIONS]);
+}
+</script>
+
 </body>
 </html>
