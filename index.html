@@ -449,7 +449,7 @@ function drawCustomButton(x, y, w, h, label, textCol, bgCol, txtSize = 16) {
   fill(bgCol);
   rect(x, y, w, h, 10);
 
-  (isMouseInRect(x, y, w, h)) {
+ if (isMouseInRect(x, y, w, h)) {
     cursor(HAND);
     fill(255, 45);
     rect(x, y, w, h, 10);
