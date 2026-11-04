@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>岩類小偵探：地質尋寶大挑戰</title>
   <!-- 引入 p5.js 核心引擎 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
@@ -16,6 +16,7 @@
       align-items: center;
       height: 100vh;
       overflow: hidden;
+      touch-action: none; /* 防止手機滑動時畫面跟著亂動 */
     }
   </style>
 </head>
@@ -23,7 +24,7 @@
 
 <script>
 // ==========================================
-// PBL 專題：岩類小偵探 - 多媒體測驗系統
+// PBL 專題：岩類小偵探 - 多媒體測驗系統 (手機/電腦跨平台版)
 // ==========================================
 
 let gameState = 0; // 0: 開始, 1: 題目, 2: 回饋, 3: 成績
@@ -85,7 +86,6 @@ const ORIGINAL_QUESTIONS = [
 let questions = [];
 
 function preload() {
-  // 直接從根目錄抓取圖片
   explorerImg = loadImage('explorer.png');
   for (let i = 1; i <= 6; i++) {
     rockImgs.push(loadImage(`rock${i}.jpg`));
@@ -93,10 +93,24 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(800, 700);
+  // 建立固定 800x700 的邏輯畫布，並開啟響應式縮放
+  let canvas = createCanvas(800, 700);
+  windowResized(); // 自動調整手機螢幕大小
+  
   textAlign(CENTER, CENTER);
   textFont("Microsoft JhengHei");
   resetGame();
+}
+
+// 📱 自動偵測螢幕大小並等比例縮放畫面（手機電腦皆適用）
+function windowResized() {
+  let scaleVal = min(windowWidth / 800, windowHeight / 700);
+  resizeCanvas(800, 700);
+  let canvasElem = document.querySelector('canvas');
+  if (canvasElem) {
+    canvasElem.style.width = (800 * scaleVal) + 'px';
+    canvasElem.style.height = (700 * scaleVal) + 'px';
+  }
 }
 
 function draw() {
@@ -229,17 +243,21 @@ function drawQuizScreen() {
   let magColor = showMagnifier ? color(188, 108, 37) : color(153, 88, 42);
   drawCustomButton(btnX, btnY, btnW, btnH, showMagnifier ? "關閉放大" : "🔍 放大鏡", color(255), magColor, 14);
 
-  if (showMagnifier && mouseX >= imgX && mouseX <= imgX + imgW && mouseY >= imgY && mouseY <= imgY + imgH) {
-    let lensSize = 80;
+  // 支援手機觸控或滑鼠移動時的放大鏡效果
+  let checkX = (touches.length > 0) ? touches[0].x : mouseX;
+  let checkY = (touches.length > 0) ? touches[0].y : mouseY;
+
+  if (showMagnifier && checkX >= imgX && checkX <= imgX + imgW && checkY >= imgY && checkY <= imgY + imgH) {
+    let lensSize = 90;
     let zoomFactor = 2;
-    let relX = mouseX - imgX;
-    let relY = mouseY - imgY;
+    let relX = checkX - imgX;
+    let relY = checkY - imgY;
 
     push();
     stroke(255, 230, 0);
     strokeWeight(3);
     fill(0, 50);
-    rect(mouseX - lensSize/2, mouseY - lensSize/2, lensSize, lensSize);
+    rect(checkX - lensSize/2, checkY - lensSize/2, lensSize, lensSize);
     
     let sWidth = lensSize / zoomFactor;
     let sHeight = lensSize / zoomFactor;
@@ -249,7 +267,7 @@ function drawQuizScreen() {
     sx = constrain(sx, 0, imgW - sWidth);
     sy = constrain(sy, 0, imgH - sHeight);
 
-    image(img, mouseX - lensSize/2, mouseY - lensSize/2, lensSize, lensSize, sx * (img.width/imgW), sy * (img.height/imgH), sWidth * (img.width/imgW), sHeight * (img.height/imgH));
+    image(img, checkX - lensSize/2, checkY - lensSize/2, lensSize, lensSize, sx * (img.width/imgW), sy * (img.height/imgH), sWidth * (img.width/imgW), sHeight * (img.height/imgH));
     pop();
   }
 
@@ -371,10 +389,21 @@ function drawEndScreen() {
   drawCustomButton(width / 2 - 100, 420, 200, 50, "🔄 再玩一次", color(255), color(153, 88, 42));
 }
 
-// 滑鼠點擊事件
+// 👆 支援手機「觸控 (touchStarted)」與電腦「滑鼠點擊」
+function touchStarted() {
+  handleInteraction(mouseX, mouseY);
+  return false; // 防止手機畫面產生預設的捲動或縮放行為
+}
+
 function mousePressed() {
+  // 如果是電腦點擊則觸發
+  handleInteraction(mouseX, mouseY);
+}
+
+// 統一的按鈕點擊邏輯處理
+function handleInteraction(mx, my) {
   if (gameState === 0) {
-    if (isMouseInRect(width / 2 - 110, 450, 220, 55)) {
+    if (isCoordInRect(mx, my, width / 2 - 110, 450, 220, 55)) {
       resetGame();
       gameState = 1;
     }
@@ -387,14 +416,14 @@ function mousePressed() {
     let btnX = imgX + imgW - btnW - 10;
     let btnY = imgY + imgH - btnH - 10;
 
-    if (isMouseInRect(btnX, btnY, btnW, btnH)) {
+    if (isCoordInRect(mx, my, btnX, btnY, btnW, btnH)) {
       showMagnifier = !showMagnifier;
     }
 
     for (let i = 0; i < q.options.length; i++) {
       let optX = 120 + i * 200;
       let optY = 485;
-      if (isMouseInRect(optX, optY, 160, 50)) {
+      if (isCoordInRect(mx, my, optX, optY, 160, 50)) {
         if (q.options[i] === q.answer) {
           isCorrect = true;
           score += 10;
@@ -406,7 +435,7 @@ function mousePressed() {
       }
     }
   } else if (gameState === 2) {
-    if (isMouseInRect(width / 2 - 90, 480, 180, 48)) {
+    if (isCoordInRect(mx, my, width / 2 - 90, 480, 180, 48)) {
       showMagnifier = false;
       if (currentQuestionIndex < questions.length - 1) {
         currentQuestionIndex++;
@@ -416,7 +445,7 @@ function mousePressed() {
       }
     }
   } else if (gameState === 3) {
-    if (isMouseInRect(width / 2 - 100, 420, 200, 50)) {
+    if (isCoordInRect(mx, my, width / 2 - 100, 420, 200, 50)) {
       resetGame();
       gameState = 0;
     }
@@ -450,7 +479,7 @@ function drawCustomButton(x, y, w, h, label, textCol, bgCol, txtSize = 16) {
   fill(bgCol);
   rect(x, y, w, h, 10);
 
-  if (isMouseInRect(x, y, w, h)) {
+  if (isCoordInRect(mouseX, mouseY, x, y, w, h)) {
     cursor(HAND);
     fill(255, 45);
     rect(x, y, w, h, 10);
@@ -464,8 +493,8 @@ function drawCustomButton(x, y, w, h, label, textCol, bgCol, txtSize = 16) {
   pop();
 }
 
-function isMouseInRect(x, y, w, h) {
-  return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+function isCoordInRect(px, py, x, y, w, h) {
+  return px >= x && px <= x + w && py >= y && py <= y + h;
 }
 
 function resetGame() {
